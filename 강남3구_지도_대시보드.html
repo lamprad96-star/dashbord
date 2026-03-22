@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>강남 3구 등록인구 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0d1117;--sf:#161b22;--sf2:#1c2128;--bd:#30363d;--amber:#f59e0b;--blue:#3b82f6;--green:#10b981;--pink:#ec4899;--text:#e6edf3;--muted:#7d8590;--up:#10b981;--down:#ef4444;--seocho:#10b981;--gangnam:#f59e0b;--songpa:#3b82f6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--text);padding:20px;min-height:100vh}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--bd)}
+.header h1{font-size:22px;font-weight:700}.header h1 span{color:var(--amber)}
+.header p{font-size:12px;color:var(--muted);margin-top:2px}
+.back-btn{display:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;align-items:center;gap:6px}
+.back-btn:hover{border-color:var(--text);color:var(--text)}.back-btn.show{display:inline-flex}
+.breadcrumb{font-size:12px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.breadcrumb .bc-link{color:var(--amber);cursor:pointer;font-weight:600}.breadcrumb .bc-link:hover{text-decoration:underline}
+.breadcrumb .bc-sep{color:var(--bd)}.breadcrumb .bc-current{color:var(--text);font-weight:700}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:all .25s}
+.kpi:hover{border-color:var(--muted);transform:translateY(-1px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.kpi-value{font-size:22px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
+.kpi-meta{font-size:11px;display:flex;align-items:center;gap:6px}
+.badge{padding:2px 7px;border-radius:12px;font-weight:700;font-size:10px}
+.badge.up{background:rgba(16,185,129,.15);color:var(--up)}.badge.down{background:rgba(239,68,68,.15);color:var(--down)}
+.kpi-sub{color:var(--muted)}
+.main-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.map-panel{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px;position:relative;min-height:460px}
+.info-panel{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px 18px}
+.panel-title{font-size:13px;font-weight:700;margin-bottom:3px}.panel-sub{font-size:11px;color:var(--muted);margin-bottom:12px}
+.map-container{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.map-container svg{width:100%;height:auto;max-height:430px}
+.district-path,.dong-path{cursor:pointer;transition:all .25s;stroke:#30363d;stroke-width:1.5}
+.district-path:hover,.dong-path:hover{filter:brightness(1.35);stroke:var(--text);stroke-width:2}
+.map-label{font-size:14px;font-weight:700;fill:var(--text);pointer-events:none;text-anchor:middle;dominant-baseline:central}
+.map-sublabel{font-size:10px;fill:var(--muted);pointer-events:none;text-anchor:middle;dominant-baseline:central;font-weight:600}
+.map-val{font-size:12px;fill:var(--text);pointer-events:none;text-anchor:middle;dominant-baseline:central;font-weight:800}
+.dong-label{font-size:9px;font-weight:600;fill:var(--text);pointer-events:none;text-anchor:middle;dominant-baseline:central}
+.dong-val{font-size:7.5px;fill:var(--muted);pointer-events:none;text-anchor:middle;dominant-baseline:central;font-weight:700}
+.mini-table{width:100%;border-collapse:collapse;font-size:11px}
+.mini-table th{color:var(--muted);font-weight:600;text-align:center;padding:5px 3px;border-bottom:1px solid var(--bd);font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+.mini-table td{padding:6px 3px;border-bottom:1px solid rgba(48,54,61,.5);text-align:center;transition:all .2s}
+.mini-table tr:last-child td{border-bottom:none}
+.mini-table tbody tr{cursor:pointer;transition:background .15s}.mini-table tbody tr:hover{background:rgba(245,158,11,.06)}
+.mini-table tr.active-row{background:rgba(245,158,11,.12)}
+.num{font-weight:700}.up-c{color:var(--up);font-weight:600}.down-c{color:var(--down);font-weight:600}
+.chart-wrap{height:190px;margin-top:6px}
+.tooltip{position:absolute;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;font-size:11px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:100;min-width:160px}
+.tooltip.show{opacity:1}
+.tooltip .tt-name{font-weight:700;font-size:13px;margin-bottom:4px}.tooltip .tt-val{font-weight:800;font-size:16px}.tooltip .tt-sub{color:var(--muted);font-size:10px;margin-top:2px}
+.fade{animation:fadeIn .35s ease}@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.table-scroll{max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
+.table-scroll::-webkit-scrollbar{width:4px}.table-scroll::-webkit-scrollbar-track{background:transparent}.table-scroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.footer{text-align:center;font-size:11px;color:var(--muted);margin-top:12px;padding-top:14px;border-top:1px solid var(--bd)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>강남 3구 <span>등록인구 대시보드</span></h1>
+    <p>서초구 · 강남구 · 송파구 &nbsp;|&nbsp; 행정동별 5개년 등록인구 변화 (2021–2025 4분기)</p>
+  </div>
+  <button class="back-btn" id="backBtn" onclick="goBack()">← 3구 전체로</button>
+</div>
+<div class="breadcrumb" id="breadcrumb"><span class="bc-current">강남 3구 전체</span></div>
+<div class="kpi-row" id="kpiRow"></div>
+<div class="main-layout">
+  <div class="map-panel" id="mapPanel">
+    <div class="map-container" id="mapContainer"></div>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="info-panel" id="infoPanel">
+    <div class="panel"><div class="panel-title" id="tableTitle">구별 등록인구</div><div class="panel-sub" id="tableSub">구를 클릭하면 행정동 상세로 이동</div><div class="table-scroll" id="dataTable"></div></div>
+    <div class="panel"><div class="panel-title" id="chartTitle">5개년 인구 추이</div><div class="panel-sub" id="chartSub">2021–2025 4분기</div><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+  </div>
+</div>
+<div class="footer">출처: 서울특별시 기본통계 — 등록인구 전년동분기 대비 증감, 4분기 기준 (2021~2025)</div>
+
+<script>
+Chart.defaults.color='#7d8590';Chart.defaults.borderColor='#30363d';Chart.defaults.font.family="'Segoe UI',sans-serif";Chart.defaults.font.size=11;
+const YEARS=['2021','2022','2023','2024','2025'];
+const C={seocho:'#10b981',gangnam:'#f59e0b',songpa:'#3b82f6'};
+const CL={seocho:'rgba(16,185,129,',gangnam:'rgba(245,158,11,',songpa:'rgba(59,130,246,'};
+
+const DATA={
+  seocho:{
+    name:'서초구',color:C.seocho,cl:CL.seocho,
+    total:[416167,408451,412078,413076,419295],
+    chg:[-12858,-7716,3627,998,6219],
+    dongs:[
+      {name:'서초1동',pop:[20711,20622,20352,20408,20211],chg:[-476,-89,-270,56,-197]},
+      {name:'서초2동',pop:[26595,26932,25140,25129,25123],chg:[4864,337,-1792,-11,-6]},
+      {name:'서초3동',pop:[32769,32379,32384,32370,32454],chg:[462,-390,5,-14,84]},
+      {name:'서초4동',pop:[31089,30521,30558,30533,30249],chg:[-629,-568,37,-25,-284]},
+      {name:'잠원동',pop:[26946,26393,27015,26958,35051],chg:[-1586,-553,622,-57,8093]},
+      {name:'반포본동',pop:[2000,292,241,235,223],chg:[-9991,-1708,-51,-6,-12]},
+      {name:'반포1동',pop:[34815,34443,34190,34144,33770],chg:[2185,-372,-253,-46,-374]},
+      {name:'반포2동',pop:[15801,15742,23436,26603,26596],chg:[-439,-59,7694,3167,-7]},
+      {name:'반포3동',pop:[22245,22773,23845,24024,23709],chg:[-167,528,1072,179,-315]},
+      {name:'반포4동',pop:[19807,19486,19229,19238,19093],chg:[-170,-321,-257,9,-145]},
+      {name:'방배본동',pop:[21083,20778,20575,20248,20170],chg:[-210,-305,-203,-327,-78]},
+      {name:'방배1동',pop:[16980,16883,16644,16570,16443],chg:[-401,-97,-239,-74,-127]},
+      {name:'방배2동',pop:[19474,18553,18171,17997,17690],chg:[-930,-921,-382,-174,-307]},
+      {name:'방배3동',pop:[18861,17321,16058,15849,15669],chg:[-2580,-1540,-1263,-209,-180]},
+      {name:'방배4동',pop:[23817,23429,23108,23040,24156],chg:[-219,-388,-321,-68,1116]},
+      {name:'양재1동',pop:[43408,42683,42333,41515,40931],chg:[-1482,-725,-350,-818,-584]},
+      {name:'양재2동',pop:[22144,21766,21545,21288,20993],chg:[-565,-378,-221,-257,-295]},
+      {name:'내곡동',pop:[17622,17455,17254,16927,16764],chg:[-524,-167,-201,-327,-163]}
+    ]
+  },
+  gangnam:{
+    name:'강남구',color:C.gangnam,cl:CL.gangnam,
+    total:[537800,534103,550282,563215,562508],
+    chg:[-6255,-3697,16179,12933,-707],
+    dongs:[
+      {name:'신사동',pop:[16213,15876,15681,15480,15291],chg:[-9213,-337,-195,-201,-189]},
+      {name:'논현1동',pop:[22702,22080,21759,21510,21500],chg:[-1032,-622,-321,-249,-10]},
+      {name:'논현2동',pop:[21331,20814,20774,20571,20506],chg:[-666,-517,-40,-203,-65]},
+      {name:'삼성1동',pop:[13136,12739,12384,12283,13005],chg:[-464,-397,-355,-101,722]},
+      {name:'삼성2동',pop:[30692,31062,30888,30834,30628],chg:[324,370,-174,-54,-206]},
+      {name:'대치1동',pop:[24199,23846,23934,23979,23800],chg:[-723,-353,88,45,-179]},
+      {name:'대치2동',pop:[36663,37098,38417,38484,38694],chg:[-1089,435,1319,67,210]},
+      {name:'대치4동',pop:[20079,19491,18929,18580,18326],chg:[-665,-588,-562,-349,-254]},
+      {name:'역삼1동',pop:[36590,35556,35326,35596,35623],chg:[-181,-1034,-230,270,27]},
+      {name:'역삼2동',pop:[36378,37269,36748,36604,36481],chg:[-913,891,-521,-144,-123]},
+      {name:'도곡1동',pop:[21539,21274,20701,20721,20852],chg:[-688,-265,-573,20,131]},
+      {name:'도곡2동',pop:[33261,32846,32738,32348,32199],chg:[-781,-415,-108,-390,-149]},
+      {name:'개포1동',pop:[6489,6922,11907,26399,26681],chg:[-181,433,4985,14492,282]},
+      {name:'개포2동',pop:[27945,29032,41804,42535,42206],chg:[5648,1087,12772,731,-329]},
+      {name:'개포3동',pop:[null,17382,16894,16767,15997],chg:[null,null,-488,-127,-770]},
+      {name:'개포4동',pop:[23870,23639,23384,23313,23159],chg:[1105,-231,-255,-71,-154]},
+      {name:'일원본동',pop:[23291,23015,22832,22619,22439],chg:[-654,-276,-183,-213,-180]},
+      {name:'일원1동',pop:[15214,14987,14711,14444,14221],chg:[-613,-227,-276,-267,-223]},
+      {name:'일원2동',pop:[17585,null,null,null,null],chg:[-124,null,null,null,null]},
+      {name:'수서동',pop:[14870,14402,14090,13694,13612],chg:[-429,-468,-312,-396,-82]},
+      {name:'세곡동',pop:[43396,43382,45724,46455,46157],chg:[-1079,-14,2342,731,-298]},
+      {name:'압구정동',pop:[26446,25902,25755,25746,25668],chg:[-994,-544,-147,-9,-78]},
+      {name:'청담동',pop:[25911,25489,24902,24253,25463],chg:[-1355,-422,-587,-649,1210]}
+    ]
+  },
+  songpa:{
+    name:'송파구',color:C.songpa,cl:CL.songpa,
+    total:[663965,664514,660025,656310,649759],
+    chg:[-9961,549,-4489,-3715,-6551],
+    dongs:[
+      {name:'풍납1동',pop:[13451,12910,12286,11742,11193],chg:[-1134,-541,-624,-544,-549]},
+      {name:'풍납2동',pop:[24953,24426,23918,23263,23142],chg:[-750,-527,-508,-655,-121]},
+      {name:'거여1동',pop:[12614,12255,12100,11919,11819],chg:[-463,-359,-155,-181,-100]},
+      {name:'거여2동',pop:[18806,23745,23653,23417,23160],chg:[-524,4939,-92,-236,-257]},
+      {name:'마천1동',pop:[19071,18618,18137,16313,15315],chg:[-838,-453,-481,-1824,-998]},
+      {name:'마천2동',pop:[18866,18150,17743,17423,17125],chg:[-853,-716,-407,-320,-298]},
+      {name:'방이1동',pop:[15766,15460,15231,15105,15031],chg:[-532,-306,-229,-126,-74]},
+      {name:'방이2동',pop:[27015,26354,26833,26808,26913],chg:[340,-661,479,-25,105]},
+      {name:'오륜동',pop:[18079,17804,17818,17608,17553],chg:[-416,-275,14,-210,-55]},
+      {name:'오금동',pop:[38654,38037,37669,38219,37477],chg:[-1014,-617,-368,550,-742]},
+      {name:'송파1동',pop:[24176,24008,23654,23392,23162],chg:[-1014,-168,-354,-262,-230]},
+      {name:'송파2동',pop:[19283,18947,18674,18695,19452],chg:[-1517,-336,-273,21,757]},
+      {name:'석촌동',pop:[32169,31602,31333,30954,30682],chg:[-997,-567,-269,-379,-272]},
+      {name:'삼전동',pop:[30695,29912,29451,29090,28796],chg:[-1144,-783,-461,-361,-294]},
+      {name:'가락본동',pop:[26523,25883,25489,25081,24837],chg:[-845,-640,-394,-408,-244]},
+      {name:'가락1동',pop:[27365,27521,27673,27652,27316],chg:[-511,156,152,-21,-336]},
+      {name:'가락2동',pop:[32406,31670,31386,30961,28758],chg:[-798,-736,-284,-425,-2203]},
+      {name:'문정1동',pop:[20198,19916,19673,19882,19797],chg:[-670,-282,-243,209,-85]},
+      {name:'문정2동',pop:[29072,28841,28972,28915,28869],chg:[-475,-231,131,-57,-46]},
+      {name:'장지동',pop:[29693,29102,28672,30774,30855],chg:[-677,-591,-430,2102,81]},
+      {name:'잠실본동',pop:[28439,28358,28300,28055,27831],chg:[-654,-81,-58,-245,-224]},
+      {name:'잠실2동',pop:[35145,34876,35005,34916,34722],chg:[-1071,-269,129,-89,-194]},
+      {name:'잠실3동',pop:[34475,34143,33948,33896,33772],chg:[-1022,-332,-195,-52,-124]},
+      {name:'잠실4동',pop:[21376,21223,21271,21086,21197],chg:[-422,-153,48,-185,111]},
+      {name:'잠실6동',pop:[16905,16713,16657,16563,16531],chg:[-461,-192,-56,-94,-32]},
+      {name:'잠실7동',pop:[9564,9427,9434,9388,9340],chg:[-339,-137,7,-46,-48]},
+      {name:'위례동',pop:[39206,44613,45045,45193,45114],chg:[8840,5407,432,148,-79]}
+    ]
+  }
+};
+
+function fmt(n){if(n===null||n===undefined)return '—';return n.toLocaleString('ko-KR')}
+function chgStr(n){if(n===null||n===undefined)return '—';const s=n>=0?'+':'';return`<span class="${n>=0?'up-c':'down-c'}">${s}${fmt(n)}</span>`}
+function pctChg(c,p){if(!p||!c)return '—';const r=(c-p)/p*100;return`<span class="${r>=0?'up-c':'down-c'}">${r>=0?'+':''}${r.toFixed(1)}%</span>`}
+function badgeHtml(n){const cls=n>=0?'up':'down';const arrow=n>=0?'▲':'▼';return`<span class="badge ${cls}">${arrow} ${fmt(Math.abs(n))}</span>`}
+
+let trendChart=null,currentView='main';
+
+// ══ KPI ══
+function renderMainKPIs(){
+  const total25=DATA.seocho.total[4]+DATA.gangnam.total[4]+DATA.songpa.total[4];
+  const total24=DATA.seocho.total[3]+DATA.gangnam.total[3]+DATA.songpa.total[3];
+  const diff=total25-total24;
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi" onclick="drillDown('seocho')" style="cursor:pointer"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${C.seocho}"></div>
+      <div class="kpi-label">서초구 (2025)</div><div class="kpi-value" style="color:${C.seocho}">${fmt(DATA.seocho.total[4])}</div>
+      <div class="kpi-meta">${badgeHtml(DATA.seocho.chg[4])}<span class="kpi-sub">전년 대비</span></div></div>
+    <div class="kpi" onclick="drillDown('gangnam')" style="cursor:pointer"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${C.gangnam}"></div>
+      <div class="kpi-label">강남구 (2025)</div><div class="kpi-value" style="color:${C.gangnam}">${fmt(DATA.gangnam.total[4])}</div>
+      <div class="kpi-meta">${badgeHtml(DATA.gangnam.chg[4])}<span class="kpi-sub">전년 대비</span></div></div>
+    <div class="kpi" onclick="drillDown('songpa')" style="cursor:pointer"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${C.songpa}"></div>
+      <div class="kpi-label">송파구 (2025)</div><div class="kpi-value" style="color:${C.songpa}">${fmt(DATA.songpa.total[4])}</div>
+      <div class="kpi-meta">${badgeHtml(DATA.songpa.chg[4])}<span class="kpi-sub">전년 대비</span></div></div>
+    <div class="kpi"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--pink)"></div>
+      <div class="kpi-label">3구 합계 (2025)</div><div class="kpi-value" style="color:var(--pink)">${fmt(total25)}</div>
+      <div class="kpi-meta">${badgeHtml(diff)}<span class="kpi-sub">전년 대비</span></div></div>`;
+}
+
+function renderDongKPIs(key){
+  const d=DATA[key];
+  const sorted=[...d.dongs].filter(x=>x.pop[4]!==null).sort((a,b)=>(b.chg[4]||0)-(a.chg[4]||0));
+  const top=sorted[0],bottom=sorted[sorted.length-1];
+  const biggest=[...d.dongs].filter(x=>x.pop[4]!==null).sort((a,b)=>b.pop[4]-a.pop[4])[0];
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:${d.color}"></div>
+      <div class="kpi-label">${d.name} 총인구 (2025)</div><div class="kpi-value" style="color:${d.color}">${fmt(d.total[4])}</div>
+      <div class="kpi-meta">${badgeHtml(d.chg[4])}<span class="kpi-sub">전년 대비</span></div></div>
+    <div class="kpi"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--up)"></div>
+      <div class="kpi-label">최대 증가 행정동</div><div class="kpi-value" style="color:var(--up);font-size:18px">${top.name}</div>
+      <div class="kpi-meta">${badgeHtml(top.chg[4])}<span class="kpi-sub">${fmt(top.pop[4])}명</span></div></div>
+    <div class="kpi"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--down)"></div>
+      <div class="kpi-label">최대 감소 행정동</div><div class="kpi-value" style="color:var(--down);font-size:18px">${bottom.name}</div>
+      <div class="kpi-meta">${badgeHtml(bottom.chg[4])}<span class="kpi-sub">${fmt(bottom.pop[4])}명</span></div></div>
+    <div class="kpi"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--pink)"></div>
+      <div class="kpi-label">최다 인구 행정동</div><div class="kpi-value" style="color:var(--pink);font-size:18px">${biggest.name}</div>
+      <div class="kpi-meta"><span class="kpi-sub">${fmt(biggest.pop[4])}명</span></div></div>`;
+}
+
+// ══ MAP ══
+function mainMap(){
+  return`<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+    <path class="district-path" d="M 40,60 L 180,40 L 220,80 L 240,160 L 230,260 L 200,320 L 120,340 L 50,280 L 30,180 Z"
+      fill="${CL.seocho}0.25)" onmouseenter="ttShow(evt,'seocho')" onmouseleave="ttHide()" onclick="drillDown('seocho')"/>
+    <text class="map-label" x="140" y="155">서초구</text>
+    <text class="map-val" x="140" y="178" fill="${C.seocho}">${fmt(DATA.seocho.total[4])}</text>
+    <text class="map-sublabel" x="140" y="198">${DATA.seocho.chg[4]>=0?'+':''}${fmt(DATA.seocho.chg[4])}</text>
+    <path class="district-path" d="M 220,80 L 370,50 L 420,100 L 430,200 L 410,290 L 340,330 L 230,260 L 240,160 Z"
+      fill="${CL.gangnam}0.25)" onmouseenter="ttShow(evt,'gangnam')" onmouseleave="ttHide()" onclick="drillDown('gangnam')"/>
+    <text class="map-label" x="330" y="160">강남구</text>
+    <text class="map-val" x="330" y="183" fill="${C.gangnam}">${fmt(DATA.gangnam.total[4])}</text>
+    <text class="map-sublabel" x="330" y="203">${DATA.gangnam.chg[4]>=0?'+':''}${fmt(DATA.gangnam.chg[4])}</text>
+    <path class="district-path" d="M 420,100 L 560,70 L 580,160 L 570,280 L 500,340 L 410,290 L 430,200 Z"
+      fill="${CL.songpa}0.25)" onmouseenter="ttShow(evt,'songpa')" onmouseleave="ttHide()" onclick="drillDown('songpa')"/>
+    <text class="map-label" x="500" y="165">송파구</text>
+    <text class="map-val" x="500" y="188" fill="${C.songpa}">${fmt(DATA.songpa.total[4])}</text>
+    <text class="map-sublabel" x="500" y="208">${DATA.songpa.chg[4]>=0?'+':''}${fmt(DATA.songpa.chg[4])}</text>
+  </svg>`;
+}
+
+function dongMap(key){
+  const d=DATA[key];const dongs=d.dongs.filter(x=>x.pop[4]!==null);
+  const cols=Math.ceil(Math.sqrt(dongs.length));const rows=Math.ceil(dongs.length/cols);
+  const cW=560/cols,cH=370/rows,pad=3;
+  const pops=dongs.map(x=>x.pop[4]);const mn=Math.min(...pops),mx=Math.max(...pops);
+  let paths='';
+  dongs.forEach((dong,i)=>{
+    const col=i%cols,row=Math.floor(i/cols);
+    const x=20+col*cW+pad,y=15+row*cH+pad,w=cW-pad*2,h=cH-pad*2;
+    const intensity=mx>mn?0.15+0.45*((dong.pop[4]-mn)/(mx-mn)):0.3;
+    paths+=`<rect class="dong-path" x="${x}" y="${y}" width="${w}" height="${h}" rx="5"
+      fill="${d.cl}${intensity})" data-dong="${i}" data-key="${key}"
+      onmouseenter="ttDong(evt,'${key}',${i})" onmouseleave="ttHide()" onclick="selectDong('${key}',${i})"/>
+    <text class="dong-label" x="${x+w/2}" y="${y+h/2-6}">${dong.name}</text>
+    <text class="dong-val" x="${x+w/2}" y="${y+h/2+7}">${fmt(dong.pop[4])}</text>`;
+  });
+  return`<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
+}
+
+// ══ TOOLTIP ══
+function ttShow(evt,key){
+  const d=DATA[key];const tt=document.getElementById('tooltip');
+  tt.innerHTML=`<div class="tt-name" style="color:${d.color}">${d.name}</div>
+    <div class="tt-val" style="color:${d.color}">${fmt(d.total[4])}명</div>
+    <div class="tt-sub">전년 대비 ${d.chg[4]>=0?'+':''}${fmt(d.chg[4])}</div>
+    <div class="tt-sub" style="margin-top:4px">클릭 → 행정동 상세 →</div>`;
+  tt.classList.add('show');
+}
+function ttDong(evt,key,i){
+  const d=DATA[key],dong=d.dongs[i];const tt=document.getElementById('tooltip');
+  tt.innerHTML=`<div class="tt-name" style="color:${d.color}">${dong.name}</div>
+    <div class="tt-val" style="color:${d.color}">${fmt(dong.pop[4])}명</div>
+    <div class="tt-sub">전년 대비 ${dong.chg[4]!==null?((dong.chg[4]>=0?'+':'')+fmt(dong.chg[4])):'—'}</div>`;
+  tt.classList.add('show');
+}
+function ttHide(){document.getElementById('tooltip').classList.remove('show')}
+
+document.getElementById('mapPanel').addEventListener('mousemove',e=>{
+  const tt=document.getElementById('tooltip');if(!tt.classList.contains('show'))return;
+  const r=document.getElementById('mapPanel').getBoundingClientRect();
+  let l=e.clientX-r.left+14,t=e.clientY-r.top-10;
+  if(l+170>r.width)l-=180;if(t+80>r.height)t-=80;
+  tt.style.left=l+'px';tt.style.top=t+'px';
+});
+
+// ══ TABLE ══
+function mainTable(){
+  const rows=Object.entries(DATA).map(([k,d])=>{
+    const r=d.total;
+    return`<tr onclick="drillDown('${k}')">
+      <td class="num" style="color:${d.color}">${d.name}</td>
+      ${YEARS.map((y,i)=>`<td class="num">${fmt(r[i])}</td>`).join('')}
+      <td>${chgStr(d.chg[4])}</td><td>${pctChg(r[4],r[0])}</td></tr>`;
+  }).join('');
+  document.getElementById('dataTable').innerHTML=`<table class="mini-table"><thead>
+    <tr><th>구</th>${YEARS.map(y=>`<th>'${y.slice(2)}</th>`).join('')}<th>증감</th><th>5년변화</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('tableTitle').textContent='구별 등록인구';
+  document.getElementById('tableSub').textContent='구를 클릭하면 행정동 상세로 이동';
+}
+
+function dongTable(key){
+  const d=DATA[key];
+  const rows=d.dongs.map((dong,i)=>{
+    return`<tr onclick="selectDong('${key}',${i})" data-dongidx="${i}">
+      <td class="num" style="text-align:left;padding-left:6px">${dong.name}</td>
+      ${YEARS.map((y,j)=>`<td class="num">${fmt(dong.pop[j])}</td>`).join('')}
+      <td>${chgStr(dong.chg[4])}</td><td>${pctChg(dong.pop[4],dong.pop[0])}</td></tr>`;
+  }).join('');
+  document.getElementById('dataTable').innerHTML=`<table class="mini-table"><thead>
+    <tr><th>행정동</th>${YEARS.map(y=>`<th>'${y.slice(2)}</th>`).join('')}<th>증감</th><th>5년변화</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('tableTitle').textContent=d.name+' 행정동별 등록인구';
+  document.getElementById('tableSub').textContent=`${d.dongs.length}개 행정동 — 행을 클릭하면 지도에서 하이라이트`;
+}
+
+// ══ CHART ══
+function mainChart(){
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:YEARS,datasets:Object.entries(DATA).map(([k,d])=>({
+      label:d.name,data:d.total,borderColor:d.color,backgroundColor:d.cl+'0.1)',
+      fill:false,tension:0.3,pointRadius:4,borderWidth:2.5
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
+      plugins:{legend:{position:'top',labels:{boxWidth:10,padding:10}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)+'명'}}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(48,54,61,0.8)'},ticks:{callback:v=>(v/10000).toFixed(0)+'만'}}}
+    }
+  });
+  document.getElementById('chartTitle').textContent='3구 인구 추이';
+  document.getElementById('chartSub').textContent='2021–2025 4분기';
+}
+
+function dongChart(key){
+  if(trendChart)trendChart.destroy();
+  const d=DATA[key];
+  const sorted=[...d.dongs].filter(x=>x.pop[4]!==null).sort((a,b)=>b.pop[4]-a.pop[4]).slice(0,6);
+  const palette=['#f59e0b','#3b82f6','#10b981','#ec4899','#8b5cf6','#06b6d4'];
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:YEARS,datasets:sorted.map((dong,i)=>({
+      label:dong.name,data:dong.pop,borderColor:palette[i],
+      fill:false,tension:0.3,pointRadius:3,borderWidth:2
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
+      plugins:{legend:{position:'top',labels:{boxWidth:8,padding:6,font:{size:10}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)+'명'}}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(48,54,61,0.8)'},ticks:{callback:v=>(v/10000).toFixed(1)+'만'}}}
+    }
+  });
+  document.getElementById('chartTitle').textContent=d.name+' 상위 행정동 추이';
+  document.getElementById('chartSub').textContent='인구 상위 6개동';
+}
+
+// ══ SELECT DONG ══
+function selectDong(key,idx){
+  document.querySelectorAll('.dong-path').forEach(p=>{
+    const d=DATA[key];const intensity=0.25;
+    p.setAttribute('fill',d.cl+intensity+')');
+  });
+  const el=document.querySelector(`[data-dong="${idx}"]`);
+  if(el)el.setAttribute('fill',DATA[key].cl+'0.7)');
+  document.querySelectorAll('.mini-table tbody tr').forEach(r=>r.classList.remove('active-row'));
+  const tr=document.querySelector(`tr[data-dongidx="${idx}"]`);
+  if(tr){tr.classList.add('active-row');tr.scrollIntoView({block:'nearest'})}
+}
+
+// ══ NAVIGATION ══
+function renderMainView(){
+  currentView='main';
+  document.getElementById('mapContainer').innerHTML=mainMap();
+  document.getElementById('backBtn').classList.remove('show');
+  document.getElementById('breadcrumb').innerHTML='<span class="bc-current">강남 3구 전체</span>';
+  renderMainKPIs();mainTable();mainChart();
+  anim();
+}
+function drillDown(key){
+  currentView=key;const d=DATA[key];
+  document.getElementById('mapContainer').innerHTML=dongMap(key);
+  document.getElementById('backBtn').classList.add('show');
+  document.getElementById('breadcrumb').innerHTML=`<span class="bc-link" onclick="goBack()">강남 3구</span><span class="bc-sep">›</span><span class="bc-current" style="color:${d.color}">${d.name} (${d.dongs.length}개동)</span>`;
+  renderDongKPIs(key);dongTable(key);dongChart(key);
+  anim();
+}
+function goBack(){renderMainView()}
+function anim(){
+  ['mapContainer','infoPanel','kpiRow'].forEach(id=>{
+    document.getElementById(id).classList.add('fade');
+    setTimeout(()=>document.getElementById(id).classList.remove('fade'),350);
+  });
+}
+
+renderMainView();
+</script>
+</body>
+</html>
